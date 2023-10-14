@@ -13,5 +13,6 @@ Here are the main scripts
 - ThreeD_Net_Tools is a Python module for the extraction and analysis of 3D spatial networks, providing an extensive range of tools beyond which is conventionally available within NetworkX
 - Within G_ANALYSIS, there is a pipeline for the network analysis of extracted spatial networks
 - Within GRAPH_RANDOM, there is code for realistically randomising spatial networks. The randomisation maintains the same degree distribution, prevents overlapping edges and ensures that the new network is within the bounded convex hull of the old network.
-- ABM_CLUSTER_NETWORK is an agent-based model for analysing disease transmission within a spatial network. Additionally, it is possible to extract the agent social networks from this, allowing an overview for how spatial structure can modify social structure
+- ABM_CLUSTER_NETWORK is an agent-based model for analysing disease transmission within a spatial network. Additionally, it is possible to extract the agent social networks from this, allowing an overview for how spatial structure can modify social structure. This needs to be run on a cluster.
 
+Please do not hesitate to reach out for help or collaboration: luke.leckie@bristol.ac.uk
