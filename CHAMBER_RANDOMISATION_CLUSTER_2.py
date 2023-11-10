@@ -213,14 +213,16 @@ if USR=='CLUSTER':
     directory="/user/work/ll16598"
 
     TREATS = pd.read_csv(directory+'/COLONY_INFO.csv')
-    nurse_k = float(sys.argv[1])
-    forag_k = float(sys.argv[2])
-    nurse_ne_k = float(sys.argv[3])
-    forag_ne_k = float(sys.argv[4])
+    nurse_k = 0
+    forag_k = 0
+    nurse_ne_k = 0
+    forag_ne_k = 0
     density_exp = float(sys.argv[5])
-    array_id = int(sys.argv[6])-1
+    array_id = int(sys.argv[6])
     iteration = int(sys.argv[7])
     timestamp = int(sys.argv[8])
+    array_id=array_id%4000
+    array_id=array_id-1
 
     dir_G=directory+"/RAND_CHAM_LENGTH"
     dir_G_widths_o=directory+'/RAND_CHAM_WIDTH'
@@ -259,6 +261,13 @@ for k in WED_MON_Gs:
     name_list_2.append(name_list[k])
 name=name_list_2[nind]
 
+
+junction_capacity1=0.9333236#0.3374093
+junction_capacity2=0.9022186#0.2759298
+junction_num=2
+#1.105
+chamber_capacity1=1.568653
+chamber_capacity2=1.454409
 print('RUNNING ON:', name)
 # In[8]:
 def process_interactions(interactions_list):
@@ -321,6 +330,12 @@ WED_MON_Gs=list(wed_seq+mon_seq)
 G_list_w2=[]
 for k in WED_MON_Gs:
     G_list_w2.append(G_list_w[k])
+if nind in wed_seq:
+    chamber_capacity=chamber_capacity1
+    junction_capacity=junction_capacity1
+else:
+    chamber_capacity=chamber_capacity2
+    junction_capacity=junction_capacity2
 Gex=G_list_w2[nind]
 Gsex = sorted(nx.connected_components(Gex), key=len, reverse=True)
 Gmaxex = Gex.subgraph(Gsex[0])
@@ -376,6 +391,7 @@ attributes = nx.get_node_attributes(Gexp, 'TYPE')
 ALL_JUNC_NUMS = [node for node, type_value in attributes.items() if type_value == 'JUNC']
 ALL_CHAM_NUMS = [node for node, type_value in attributes.items() if type_value == 'CHAM']
 if len(ALL_CHAM_NUMS)==0:
+    print('NO CHAMBERS', array_id)
     sys.exit()
 ALL_NE_NUMS = [node for node, type_value in attributes.items() if type_value == 'NEST EN']
 END = [node for node, type_value in attributes.items() if type_value == 'END']
@@ -389,9 +405,7 @@ if count_nodes > 0:
     mean_closeness_centrality = total_closeness / count_nodes
 else:
     mean_closeness_centrality=np.nan
-flow_centrality = nx.current_flow_betweenness_centrality_subset(Gexp_inv, \
-                                                         sources=ALL_NE_NUMS,\
-                                                         targets=JEC, weight='weight', normalized=False)
+flow_centrality = nx.current_flow_betweenness_centrality(Gexp_inv, weight='weight', normalized=False)
 total_bc = sum(flow_centrality.values())
 flow_centrality = {node: centrality/total_bc for node, centrality in flow_centrality.items()}
 # Sum the centrality values of the specific nodes and count the number of nodes
@@ -402,6 +416,10 @@ if count_nodes > 0:
     mean_flow_centrality = total_centrality / count_nodes
 else:
     mean_flow_centrality=np.nan
+    
+#info_cen = nx.current_flow_closeness_centrality(G2, weight='weight')
+#max_centrality = max(info_cen.values())
+i#nfo_cen = {node: centrality / max_centrality for node, centrality in info_cen.items()}
     
 nech_all_short_paths, nech_all_tot_paths, nech_all_sptl_paths, \
         nech_all_short_paths_spatial, nech_shortest_short_paths, \
@@ -547,12 +565,20 @@ def generate_number(mean, std_dev, min_val, max_val):
 #mean = 0.4925927  # proportion nurses
 #mean = 0.7 # proportion nurses 2
 #std_dev = 0.1026826  # specify the standard deviation of the normal distribution
+t_res=10
+#Time to run the simulation
+#wait_t=16 #Time for an ant to stop if it bumps into another ant
+
+#mean = 0.4925927  # proportion nurses
+#mean = 0.7 # proportion nurses 2
+#std_dev = 0.1026826  # specify the standard deviation of the normal distribution
 mean=0.432
 std_dev=0.212
 # generate the first number from a normal distribution with the specified mean and standard deviation
 rand_num = random.uniform(0, 1)
 
 nurse_number = generate_number(mean, std_dev, 0, 180)
+nurse_number=180
 forager_number = 180 - nurse_number
 rand_num = random.uniform(0, 1)
 
@@ -565,25 +591,11 @@ inoculated_forager_number = 20 - inoculated_nurse_number
 
 transmission_rate=(np.mean(list([0.00066,0.00072, 0.00069])))/2
 #spores per time step to be transmitted. Mean of front, back and side contacts, from science
-ant_movement_speed=2#cm/s half a body length per second
-ants_cm=0.7#ant length
-#exponents for how much time foragers and nurses want to spend in chambers or nest_entrances,
-#dependent on ant density. Could also sample from different normal distributions,
-#which may certainly be more appropriate in foraging area
+ant_movement_speed=0.2#cm/s half a body length per second
+ants_cm=0.4
+ant_length=0.4
 
-random_entrance=True
-junction_capacity=0.2933291039638014
-junction_num=2
-#1.105
-chamber_capacity=1.5026958128065395
-foraging_capacity=95.03#main forage
-foraging_capacity2=63.62#petri
-density_aversion=0.1
-#py=2#not sure what this is @the amount of pheromone that reduces the probabiliy of leaving by half"
-sigmoidal=False #if There should be a sigmoid of occupancy in chambers and junctions, 
-#with inflexion at the capacity
-density_dependence=1 #this impacts the influence of density on transmission, my multiplying it
-#can safely set at 0
+
 #transmission_cap=10
 B= np.mean(list([0.39,0.36, 0.23])) #(probability of contact 
 #should we * by 2?
@@ -591,8 +603,6 @@ B= np.mean(list([0.39,0.36, 0.23])) #(probability of contact
 epidemic_start=21600
 dt=1#timestep
 Tmax=64800
-
-
 sigma=0.00024#transmission threshold
 rando_stasis=False
 
@@ -609,7 +619,71 @@ INITIAL_NE=tuple([XMID,YMID,0])
 
 
 # In[21]:
+max_interact=2
+max_out_prop=0.3
 
+# In[ ]:
+def get_free_ant_encounters(N1, s1, v_bar, Dt, DS):
+
+  I11 = (1/2) * (N1**2) * s1*((math.sqrt(2) * v_bar * Dt) / DS)
+  
+  return I11
+def transmit(n, lst):
+    
+    max_attempts = 200  # You can adjust this based on your needs
+    attempts = 0
+
+    usage_count = {item: 0 for item in lst}
+
+    # Dictionary to keep track of how many times each item has been used
+    usage_count = {item.identity: 0 for item in lst}
+
+    # Set to keep track of pairs that have already been formed
+    formed_pairs = set()
+
+    pairs = []
+
+    while len(pairs) < n and len(pairs)<len(lst) and attempts < max_attempts:
+
+        # Shuffle the list
+        random.shuffle(lst)
+        attempts+=1
+        if attempts>=max_attempts:
+            print('attemptmax')
+            return lst
+        # Try forming a pair
+        ant, ant2 = lst[0], lst[1]
+
+        # Ensure we don't have duplicate items in a pair and form pairs with distinct items
+        if ant != ant2:
+            # Convert pair to a frozenset so order doesn't matter, e.g., (1, 2) is same as (2, 1)
+            current_pair = frozenset([ant.identity, ant2.identity])
+            #print(current_pair)
+            # Check if pair hasn't been formed before and items haven't been used more than twice
+            if current_pair not in formed_pairs and usage_count[ant.identity] < 2 and usage_count[ant2.identity] < 2:
+                pairs.append((ant.identity, ant2.identity))
+                formed_pairs.add(current_pair)
+                usage_count[ant.identity] += 1
+                usage_count[ant2.identity] += 1
+                #this is where social net would be added
+                if random.random()>B:
+                    continue
+                #print('transmitted')
+                if ant.spores>ant2.spores and ant.spores>sigma:
+                    load_difference=ant.spores-ant2.spores
+                    if load_difference<=0:
+                        continue
+                    transmitted=transmission_rate*load_difference*dt
+                    ant2.spores+=transmitted
+                    ant.spores-=transmitted
+                elif ant2.spores>ant.spores and ant2.spores>sigma:
+                    load_difference=ant2.spores-ant.spores
+                    if load_difference<=0:
+                        continue
+                    transmitted=transmission_rate*load_difference*dt
+                    ant.spores+=transmitted
+                    ant2.spores-=transmitted
+    return lst
 
 wed_seq = [96 - i*5 for i in range(20)]
 wed_seq.reverse()
@@ -628,60 +702,68 @@ all_junction_nodes = []
 all_end_nodes = []
 all_edges=[]
 all_nodes=[]
-for g in range(0,len(G_list)):
 #for g in range(0,len(wed_seq)):
-    G=G_list[g]
-    G2=G_list_width[g]
-    #list_ant=[]
-    attributes = nx.get_node_attributes(G, 'TYPE')
-    nest_nodes = [node for node, type_value in attributes.items() if type_value == 'NEST EN']
-    min_dist=10
-    initial_nes=[]
-    for ne in nest_nodes:
-        x,y,z=ast.literal_eval(G.nodes[ne]['coord'])
+G=G_list[0]
+G2=G_list_width[0]
+#list_ant=[]
+attributes = nx.get_node_attributes(G, 'TYPE')
+nest_nodes = [node for node, type_value in attributes.items() if type_value == 'NEST EN']
+min_dist=10
+nest_nodes2=[]
+initial_nes=[]
+for ne in nest_nodes:
+    x,y,z=ast.literal_eval(G.nodes[ne]['coord'])
+
+
+    xy=tuple([x,y,0])
+    ne2=tuple([ne,xy])
+    nest_nodes2.append(ne2)
+    dist=calculate_distance(xy,INITIAL_NE)
+    if dist<min_dist:
+        initial_ne=tuple([ne,xy])
+        min_dist=dist
+initial_nes.append(initial_ne)
+nest_nodes2=list(set(nest_nodes2)-set(initial_nes))
+chamber_nodes = [node for node, type_value in attributes.items() if type_value == 'CHAM']
+junction_nodes = [node for node, type_value in attributes.items() if type_value == 'JUNC']
+end_nodes = [node for node, type_value in attributes.items() if type_value == 'END']
+if len(chamber_nodes)==0:
+    chamber_nodes=np.nan
+
+
+all_initial_nes.append(initial_nes)
+all_nest_nodes.append(nest_nodes2)
+all_chamber_nodes.append(chamber_nodes)
+all_junction_nodes.append(junction_nodes)
+all_end_nodes.append(end_nodes)
+try:
+    node_list = chamber_nodes + initial_nes+nest_nodes2+ end_nodes+ junction_nodes
+except TypeError:
+    node_list = initial_nes+nest_nodes2+ end_nodes+ junction_nodes
+
+all_nodes.append(node_list)
+edge_weights = []
+for u, v, data in G.edges(data=True):
+    length = data['weight']
+    width = G2.get_edge_data(u, v)['weight']
+    if u in nest_nodes:
+        x,y,z=ast.literal_eval(G.nodes[u]['coord'])
         xy=tuple([x,y,0])
-        dist=calculate_distance(xy,INITIAL_NE)
-        if dist<min_dist:
-            initial_ne=ne
-            min_dist=dist
-    initial_nes.append(initial_ne)
-    nest_nodes=list(set(nest_nodes)-set(initial_nes))
-    chamber_nodes = [node for node, type_value in attributes.items() if type_value == 'CHAM']
-    junction_nodes = [node for node, type_value in attributes.items() if type_value == 'JUNC']
-    end_nodes = [node for node, type_value in attributes.items() if type_value == 'END']
-    if len(chamber_nodes)==0:
-        chamber_nodes=np.nan
-
-
-#     nest_nodes = [(node, list_ant) for node in nest_nodes]
-#     chamber_nodes = [(node, list_ant) for node in chamber_nodes]
-#     junction_nodes = [(node, list_ant) for node in junction_nodes]
-#     end_nodes = [(node, list_ant) for node in end_nodes]
-
-    all_initial_nes.append(initial_nes)
-    all_nest_nodes.append(nest_nodes)
-    all_chamber_nodes.append(chamber_nodes)
-    all_junction_nodes.append(junction_nodes)
-    all_end_nodes.append(end_nodes)
-    try:
-        node_list = chamber_nodes + initial_nes+nest_nodes+ end_nodes+ junction_nodes
-    except TypeError:
-        node_list = initial_nes+nest_nodes+ end_nodes+ junction_nodes
-
-    all_nodes.append(node_list)
-    edge_weights = []
-    for u, v, data in G.edges(data=True):
-        length = data['weight']
-        width = G2.get_edge_data(u, v)['weight']
-        
-        
-        list_coords=[]
-        #This is subject to change depending on if cells or real coords are used
-
-        edge_weights.append((tuple([u, v]), length, width))
-    all_edges.append(edge_weights)
-    
-
+        u=tuple([u,xy])
+    if v in nest_nodes:
+        x,y,z=ast.literal_eval(G.nodes[v]['coord'])
+        xy=tuple([x,y,0])
+        v=tuple([v,xy])   
+    list_coords=[]
+    #This is subject to change depending on if cells or real coords are used
+    l=0
+    length_mm=round(length*10)
+    for i in range(0, length_mm):
+        list_coords.append(l)
+        l+=1
+    edge_weights.append((tuple([u, v]), length, width))
+    print(length,width)
+all_edges.append(edge_weights)
 
 
 
@@ -696,12 +778,13 @@ for g in range(0,len(G_list)):
 # In[ ]:
 mega_df=[]
 mega_df2=[]
-for iterr in range(0,10):
-    dt=1
+for iterr in range(0,5):
+
     import copy
+    print('ITER', iterr)
     ALL_ITS_NODE_ANTS=[]
     ALL_ITS_EDGE_ANTS=[]
-
+    max_outside=180*max_out_prop
     min_cham_time_list=[]
     ALL_NODE_ANTS=[]
     ALL_EDGE_ANTS=[]
@@ -748,55 +831,36 @@ for iterr in range(0,10):
     inodes=ne_list+initial_ne_list
     edge_ants={edge: [] for edge in edge_list}
     node_ants = {node: [] for node in node_list} # create an empty list for each node
-    d1_list=[node for node in node_list if len(list(G.neighbors(node)))==1]
+    d1_list_ne=[node for node in ne_list if len(list(G.neighbors(node[0])))==1]
+    d1_list_ine=[node for node in initial_ne_list if len(list(G.neighbors(node[0])))==1]
+    d1_list=end_list+d1_list_ne+d1_list_ine
     for ant in original_ants:
         chosen_ne = random.choice(node_list)
         ant.prev_node=chosen_ne
-        ant.next_node=random.choice(list(G.neighbors(chosen_ne)))
+        if chosen_ne in inodes:
+            ant.next_node=random.choice(list(G.neighbors(chosen_ne[0])))
+        else:
+            no=random.choice(list(G.neighbors(chosen_ne)))
+            for nod in node_list:
+                if nod[0]==no:
+                        ant.next_node=nod
+                        break
         node_ants[chosen_ne].append(ant) # add the ant to the list for the chosen node
 
         #print(ant.spores)
-    print(G)
     T=0
     while T<Tmax:
         transmission_chamber=0
         transmission_tunnel=0
         transmission_junction=0
-        for node in chamber_list:
-            ants=node_ants[node]
-            for ant in ants:
-                if ant.caste=='Inoculated_Forager' and T<min_cham_time:
-                    min_cham_time=T
 
-    #             if T in list_t_check:
-    #                 forage_complete3=False
-    #                 ants=[ant for ne_node in node_list for \
-    #                     ant in node_ants[ne_node]] 
-    #                 eants=[ant for ne_node in edge_list for \
-    #                     ant in edge_ants[ne_node]] 
-    #                 antsj=[ant for ne_node in junction_list for \
-    #                     ant in node_ants[ne_node]] 
-    #                 print('edge_ants', len(eants))
-    #                 print('jun_ants', len(antsj))
-
-    #                 print('total', len(ants)+len(eants))
-    #                 print('time=', T)
-    #                 for node in node_list:
-
-    #                     if node in ne_list and forage_complete3==False:
-    #                         ants=[ant for ne_node in ne_list for \
-    #                                             ant in node_ants[ne_node]] 
-    #                         forage_complete3=True
-    #                         print('foraging=',len(ants))
-    #                     if node in chamber_list:
-    #                         print(node)
-    #                         ants=node_ants[node]
-    #                         print('chamber ants=', len(ants))
+#                         print('chamber ants=', len(ants))
         if T==epidemic_start:
+            max_outside=200*max_out_prop
             for ant in inoculateds:
                 chosen_ne = random.choice(inodes)
                 ant.prev_node=chosen_ne
-                ant.next_node=random.choice(list(G.neighbors(chosen_ne)))
+                ant.next_node=random.choice(list(G.neighbors(chosen_ne[0])))
                 node_ants[chosen_ne].append(ant) # add the ant to the list for the chosen node
         ##FIRST STEP ADVANCING ANTS FROM NODES
         for node in node_list:
@@ -805,8 +869,18 @@ for iterr in range(0,10):
             choices=[]
             for ant in ants:
                 #print(ant.t)
+                outside_num=len([ant for ne_node in node_list for \
+                     ant in node_ants[ne_node]]) 
+
+                if T % t_res ==0 and T>epidemic_start:
+                    G_INTERACTIONS_ANT_SPACE.append(tuple([ant.identity, node, ant.caste,T]))
                 leaving=False
-                if node in chamber_list and ant.t<=T:
+                
+                if node in ne_list  and outside_num>=max_outside and ant.t<T:
+                        leaving=True
+                elif node in initial_ne_list and  outside_num>=max_outside and ant.t<T:
+                        leaving=True
+                elif node in chamber_list and ant.t<T:
                     ants_occupying=len(node_ants[node])
                     pn=ants_occupying#/10 #pheromone
 
@@ -817,12 +891,12 @@ for iterr in range(0,10):
                         elif ant.caste=='Forager' or ant.caste=='Inoculated_Forager':
                             leaving_probability=0.5/((pn)+(forag_k))
                     except ZeroDivisionError:
-                        leaving_probability=0
-                    if random.random()<leaving_probability:
+                        leaving_probability=1
+                    if random.random()<leaving_probability or leaving_probability<0:
                         leaving=True
                        # print(leaving_probability, rando)
 
-                elif node in ne_list and ant.t<=T:
+                elif node in ne_list and ant.t<T:
                     ants_occupying=len(node_ants[node])
                     pn=ants_occupying#/10 #pheromone
                     try:
@@ -831,8 +905,8 @@ for iterr in range(0,10):
                         elif ant.caste=='Forager' or ant.caste=='Inoculated_Forager':
                             leaving_probability=0.5/((pn)+(forag_ne_k))
                     except ZeroDivisionError:
-                        leaving_probability=0
-                    if leaving_probability>random.random():
+                        leaving_probability=1
+                    if leaving_probability>random.random() or leaving_probability<0:
                         #print(leaving_probability, 'left_ne')
                         leaving=True
                 elif node in initial_ne_list:
@@ -844,28 +918,34 @@ for iterr in range(0,10):
                         elif ant.caste=='Forager' or ant.caste=='Inoculated_Forager':
                             leaving_probability=0.5/((pn)+(forag_ne_k))
                     except ZeroDivisionError:
-                        leaving_probability=0
-                    if leaving_probability>random.random():
+                        leaving_probability=1
+                    if leaving_probability>random.random() or leaving_probability<0:
                         #print(leaving_probability, 'left_ne')
                         leaving=True
-                elif node in junction_list and ant.t<=T:
+                elif node in junction_list and ant.t<T:
                     leaving=True
 
-                elif node in d1_list and ant.t<=T:
+                elif node in d1_list and ant.t<T:
                     leaving=True
-                    apn=ant.prev_node
-                    ann=ant.next_node
-                    ant.next_node=ant.prev_node
-                    ant.prev_node=ann
-                    ant_nodes=list([ant.next_node, ant.prev_node])
                     #random_ne_choice
-                    if node in ne_list:
-                        node=random.choice(ne_list)
-                        ant_nodes=list([node])
+                    #if node in ne_list:
+                    #    node=random.choice(ne_list)
+                   #     ant_nodes=list([node])
                     for edge in edge_list:
-                        if edge[0][1] in ant_nodes:
-                            ant.t+=edge[1]
+                        if node==edge[0][1]:
+                        
+                            ant.prev_node=edge[0][1]
+                            ant.next_node=edge[0][0]
+                            ant.t+=edge[1]/ant_movement_speed
                             chosen_edge=edge
+                            break
+                        if node==edge[0][0]:
+                        
+                            ant.prev_node=edge[0][0]
+                            ant.next_node=edge[0][1]
+                            ant.t+=edge[1]/ant_movement_speed
+                            chosen_edge=edge
+                            break
                     edge_ants[chosen_edge].append(ant)
                     node_ants[node] = [a for a in node_ants[node] if a.identity != ant.identity]  # remove the ant by ID
                     continue
@@ -889,8 +969,8 @@ for iterr in range(0,10):
                             choices.append(edge)
                     if len(choices)==0:
                         continue
-                    #stops going back unless at tunnel end
-                    if len(choices)>1 and node not in inodes:
+                    #stops going back if at junction
+                    if len(choices)>1 and node not in inodes and node not in chamber_list:
                         choices2=[]
                         for edge in choices:
                             if edge[0][1]==ant.prev_node and edge[0][0]==ant.next_node:
@@ -906,9 +986,9 @@ for iterr in range(0,10):
                         ant.next_node = chosen_edge[0][0]
                     else:
                         ant.next_node = chosen_edge[0][1]
-    #                             if ant.next_node in chamber_nodes:
-    #                                 print('chamber_habitation')
-                    time=(T+round((edge[1])/ant_movement_speed))
+#                             if ant.next_node in chamber_nodes:
+#                                 print('chamber_habitation')
+                    time=(T+((edge[1])/ant_movement_speed))
                     #print(time)
                     #print(ant.t)
                     ant.t=time
@@ -920,129 +1000,94 @@ for iterr in range(0,10):
                     node_ants[node] = [a for a in node_ants[node] if a.identity != ant.identity]  # remove the ant by ID
 
         for edge in edge_list:
+        
             ants=edge_ants[edge]
+            outside_num=len([ant for ne_node in node_list for \
+                     ant in node_ants[ne_node]]) 
             for ant in ants:
-                if ant.t<=T:
+                if ant.t<T:
                     num_ants=len(node_ants[ant.next_node])
                     #check capacity of junction. using width of tunnel leaving from
                    # capacity=(edge[2]*10)+1
-                    capacity=junction_num#/ants_cm
+                    capacity_j=junction_num#/ants_cm
+                    capacity_e=1#/ants_cm
                     n=ant.next_node
-                    if  num_ants>=capacity and n in junction_list:
-    #                             if T>1000:
-    #                                 print(capacity, num_ants)
+                    if  num_ants>=capacity_j and n in junction_list:
                         continue
-                    #if n in ne_list:
-                        #n=random.choice(ne_list)
+                    elif  num_ants>=capacity_e and n in end_list:
+                        continue
+                    elif n in ne_list and outside_num>=max_outside or n in initial_ne_list and outside_num>=max_outside:
+                        continue
+                    elif n in ne_list:
+                    
+                        n1=n
+                        n=random.choice(ne_list)
+                        #same
+                        ant.prev_node=n
+                        ant.next_node=n
+                        dist=calculate_distance(n1[1],n[1])
+                        time=(T+(dist/ant_movement_speed))
+                        ant.t=time
 
                     node_ants[n].append(ant)
 
            #         print(n, 'node entered')
                    #print('ant entering node', n)
-    #                         if n in chamber_list and T>1000:
-    #                             print(n, ant)
+#                         if n in chamber_list and T>1000:
+#                             print(n, ant)
                     #print(node_ants)
                     edge_ants[edge] = [a for a in edge_ants[edge] if a.identity != ant.identity]  # remove the ant by ID
 
         #TRANSMISSION 
         #TRANSMISSION
-
+           
         if T<epidemic_start and T in t_save:
             node_ants2=copy.deepcopy(node_ants)
             edge_ants2=copy.deepcopy(edge_ants)
             G_NODE_ANTS.append(node_ants2)
             G_EDGE_ANTS.append(edge_ants2)
         if T<epidemic_start:
-
+        
             T+=dt  
             continue
         for node in node_list:
-            if node in ne_list or node in initial_ne_list:
+            if node in ne_list or node in initial_ne_list or node in end_list:
                 continue
-            elif node in junction_list:
-                capacity=junction_capacity
+
             elif node in chamber_list:
                 capacity=chamber_capacity
 
             ants=node_ants[node]
-            random.shuffle(ants)
-            ants2=ants
-            interacted_pairs=[]
-
             ants_in_node=len(ants)
+            n_encounters=get_free_ant_encounters(ants_in_node, ant_length, ant_movement_speed,dt, capacity)
+            if node in junction_list:
+                n_encounters=1#=junction_capacity#change to 1
             if ants_in_node<=1:
                 continue
-            density=ants_in_node/capacity
+            #print(T, 'transmission in node')
+            ants=transmit(n_encounters, ants)
+            node_ants[node]=ants
 
-            for ant in ants:
-                for ant2 in ants2:
-                    load_difference=ant.spores-ant2.spores
 
-                    if ant.identity!=ant2.identity  and\
-                    random.random() > 1-((1-B)**(density**density_exp)):
-                        pass
-
-                    else:
-                        continue
-                    if ant.spores<sigma or load_difference<=0:
-
-                            continue
-
-                    else:
-                        load_difference=ant.spores-ant2.spores
-                        #transmitted=(load_difference/2)-((1-(2*transmission_rate))**dt)*(load_difference/2)
-                        transmitted=transmission_rate*load_difference*dt
-                        ant2.spores+=transmitted
-                        ant.spores-=transmitted
 
 
         #edge transmission            
         for edge in edge_list:
+            capacity=edge[2]*edge[1]
             ants=edge_ants[edge]
-            ants2=ants
-            interacted_pairs=[]
-
-            capacity=edge[1]*edge[2]
             ants_in_edge=len(ants)
             if ants_in_edge<=1:
                 continue
-            density=ants_in_edge/capacity
-            #print(capacity, density)
-            #            adjust=math.log(ants_in_contact)
-            for ant in ants:
-                for ant2 in ants2:
-                    load_difference=ant.spores-ant2.spores
+            n_encounters=get_free_ant_encounters(ants_in_edge, ant_length, ant_movement_speed, dt, capacity)
 
-
-                    if ant.identity!=ant2.identity  and\
-                    random.random() > 1-((1-B)**(density**density_exp)):
-                        pass
-                    else:
-                        continue
-                    if ant.spores<sigma or load_difference<=0:
-                            continue
-
-                    else:
-
-                        load_difference=ant.spores-ant2.spores
-                        #transmitted=(load_difference/2)-((1-(2*transmission_rate))**dt)*(load_difference/2)
-                        transmitted=transmission_rate*load_difference*dt
-                        ant2.spores+=transmitted
-                        ant.spores-=transmitted
-    #                             if ant.spores<0:
-    #                                 ant.spores=0
-    #                             if ant2.spores>100:
-    #                                 ant2.spores=100
-    #                     print(ant.spores, ant2.spores)
-    #             if T==400:
-    #                 for key in node_ants.keys():
-    #                     for ant in node_ants[key]:
-    #                         print(ant.spores)
-        g_transmission_junction.append(transmission_junction)
-        g_transmission_chamber.append(transmission_chamber)
-        g_transmission_tunnel.append(transmission_tunnel)
+            if ants_in_node<=1:
+                continue
+            #print(T, 'transmission in edge')
+            ants=transmit(n_encounters, ants)
+            edge_ants[edge]=ants
+            
         T+=dt  
-
+       
         if T in t_save:
             node_ants2=copy.deepcopy(node_ants)
             edge_ants2=copy.deepcopy(edge_ants)
@@ -1066,7 +1111,7 @@ for iterr in range(0,10):
     #         all_transmission_chamber.append(g_transmission_chamber)
     #         all_transmission_tunnel.append(g_transmission_tunnel)
     #indent end here
-    paras=str([nurse_k,forag_k,nurse_ne_k,forag_ne_k,density_exp])
+   # paras=str([nurse_k,forag_k,nurse_ne_k,forag_ne_k,density_exp])
     strits=str(epidemic_start)
     strarr=str(Tmax)
     stramp=str(timestamp)
@@ -1302,8 +1347,8 @@ mega_df=pd.concat(mega_df)
 mega_df = mega_df.reset_index(drop=True)
 mega_df2=pd.concat(mega_df2)
 mega_df2 = mega_df2.reset_index(drop=True)
-mega_df.to_csv(save_directory+'/_FULL_'+strits+'_'+strarr+'_'+paras+'_'+stramp+'.csv',index=False)
-mega_df2.to_csv(save_directory+'/_SUMMARY_'+strits+'_'+strarr+'_'+paras+'_'+stramp+'.csv',index=False)
+mega_df.to_csv(save_directory+'/_FULL_'+strad+'_'+strits+'_'+name+'_'+stramp+'.csv',index=False)
+mega_df2.to_csv(save_directory+'/_SUMMARY_'+strad+'_'+strits+'_'+name+'_'+stramp+'.csv',index=False)
 
 
 
